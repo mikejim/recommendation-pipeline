@@ -3,10 +3,14 @@ import random
 import time
 from datetime import datetime
 from kafka import KafkaProducer
+from dotenv import load_dotenv
+import os
 
-# ---------- Configuration ----------
-KAFKA_BROKER = 'localhost:9092'
-TOPIC_NAME = 'watch_events'
+# ---------- Load Environment Variables ----------
+load_dotenv()
+
+KAFKA_BROKER = os.getenv("KAFKA_BROKER")
+TOPIC_NAME = os.getenv("TOPIC_NAME")
 
 # ---------- Sample Data ----------
 user_ids = [f"user_{i}" for i in range(1, 11)]

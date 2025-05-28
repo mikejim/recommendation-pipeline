@@ -1,0 +1,63 @@
+version: '3.7'
+
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.4.0
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+
+  kafka:
+    image: confluentinc/cp-kafka:7.4.0
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+
+  spark-master:
+    image: bitnami/spark:latest
+    environment:
+      - SPARK_MODE=master
+    ports:
+      - "8080:8080"
+
+  spark-worker:
+    image: bitnami/spark:latest
+    environment:
+      - SPARK_MODE=worker
+      - SPARK_MASTER_URL=spark://spark-master:7077
+    depends_on:
+      - spark-master
+
+  spark-submit:
+    image: bitnami/spark:latest
+    depends_on:
+      - kafka
+      - redis
+      - spark-master
+    # this is the directory where your Spark application is located
+    volumes:
+      - ./spark/app:/opt/spark-app
+    # this is the entrypoint script that will run your Spark application. 
+    entrypoint: [ "/bin/bash", "-c" ]
+    # this is the command that will be executed in the container
+    # this command assumes you have a Spark application named 
+    # `stream_watch_events.py` in the `./spark/app` directory
+    command: >
+      "
+      /opt/bitnami/scripts/spark/entrypoint.sh &&
+      /opt/bitnami/spark/bin/spark-submit
+        --master spark://spark-master:7077
+        --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.3.1
+        /opt/spark-app/stream_watch_events.py
+      "
