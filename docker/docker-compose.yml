@@ -40,24 +40,10 @@ services:
       - spark-master
 
   spark-submit:
-    image: bitnami/spark:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
     depends_on:
       - kafka
       - redis
       - spark-master
-    # this is the directory where your Spark application is located
-    volumes:
-      - ./spark/app:/opt/spark-app
-    # this is the entrypoint script that will run your Spark application. 
-    entrypoint: [ "/bin/bash", "-c" ]
-    # this is the command that will be executed in the container
-    # this command assumes you have a Spark application named 
-    # `stream_watch_events.py` in the `./spark/app` directory
-    command: >
-      "
-      /opt/bitnami/scripts/spark/entrypoint.sh &&
-      /opt/bitnami/spark/bin/spark-submit
-        --master spark://spark-master:7077
-        --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.3.1
-        /opt/spark-app/stream_watch_events.py
-      "
