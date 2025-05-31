@@ -58,7 +58,7 @@ def write_to_redis(batch_df, batch_id):
 query = agg.writeStream \
     .outputMode("update") \
     .foreachBatch(write_to_redis) \
-    .option("checkpointLocation", "./checkpoint") \
+    .option("checkpointLocation", "/tmp/checkpoint") \
     .start()
 
 query.awaitTermination()

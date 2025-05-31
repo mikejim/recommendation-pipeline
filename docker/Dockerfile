@@ -1,5 +1,8 @@
 FROM bitnami/spark:latest
 
+# Install redis Python package
+RUN pip install redis
+
 COPY spark/app/stream_watch_events.py /opt/spark-app/
 WORKDIR /opt/spark-app
 
