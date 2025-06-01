@@ -3,10 +3,15 @@ from pyspark.sql.functions import from_json, col, window
 from pyspark.sql.types import StructType, StringType, IntegerType, TimestampType
 import redis
 import json
+import os
+from dotenv import load_dotenv
 
-# Redis config
-REDIS_HOST = "localhost"
-REDIS_PORT = 6379
+# Load environment variables
+load_dotenv()
+
+# Redis connection settings
+redis_host = os.getenv("REDIS_HOST", "localhost")
+redis_port = int(os.getenv("REDIS_PORT", 6379))
 
 # Define schema of Kafka message
 schema = StructType() \
@@ -27,7 +32,7 @@ spark.sparkContext.setLogLevel("WARN")
 # Read from Kafka topic
 df = spark.readStream \
     .format("kafka") \
-    .option("kafka.bootstrap.servers", "localhost:9092") \
+    .option("kafka.bootstrap.servers", "kafka:9093") \
     .option("subscribe", "watch_events") \
     .option("startingOffsets", "latest") \
     .load()
@@ -47,11 +52,12 @@ agg = parsed.withColumn("event_time", col("timestamp").cast(TimestampType())) \
 
 # Function to write each micro-batch to Redis
 def write_to_redis(batch_df, batch_id):
-    redis_client = redis.Redis(host=REDIS_HOST, port=REDIS_PORT)
+    # Redis client
+    r = redis.Redis(host=redis_host, port=redis_port)
     for row in batch_df.collect():
         key = f"user:{row['user_id']}:genre:{row['genre']}"
         value = row["sum(duration_watched)"]
-        redis_client.set(key, value)
+        r.set(key, value)
         print(f"🔁 Wrote to Redis: {key} = {value}")
 
 # Write stream with foreachBatch

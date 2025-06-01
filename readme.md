@@ -1,57 +1,132 @@
 # 🎬 Netflix-Style Content Recommendation Pipeline
 
-This project simulates a **real-time and batch data pipeline** for personalized content recommendations, inspired by the kind of infrastructure used at Netflix. It demonstrates complete data engineering capabilities — from data ingestion and processing to serving personalized recommendations.
+A full-stack **Data Engineering project** that simulates a Netflix-style streaming service, processing user watch behavior in **real-time** and **batch** using Kafka, Spark, Redis, and FastAPI. Designed to showcase **streaming data pipelines** and **real-time analytics**.
 
 ---
 
-## 🚀 Project Goals
+## 🚀 Architecture Overview
 
-- Simulate user watch activity using synthetic event streams
-- Ingest and process data in real time using **Kafka + Spark Streaming**
-- Aggregate historical watch patterns via **batch ETL** using **PySpark** or **dbt**
-- Generate user preferences and recommend shows based on genre affinity
-- Serve personalized recommendations through a **FastAPI** REST API
-- Deploy components in containers using **Docker**
-
----
-
-## 🧱 System Architecture
-
-**Data Flow Overview**:
-
-1. **Data Simulation**: Python script generates user watch events.
-2. **Ingestion Layer**: Events are pushed to a Kafka topic (`watch_events`).
-3. **Streaming Pipeline**: Spark Streaming reads Kafka events and updates real-time user preferences stored in Redis.
-4. **Batch Pipeline**: A daily job (PySpark/dbt) aggregates long-term preferences from event logs and stores results in PostgreSQL.
-5. **Serving Layer**: FastAPI service fetches both real-time and batch data to provide show recommendations per user.
+```
+[ User Events ] → Kafka → Spark (Structured Streaming) → Redis → FastAPI (Real-time API)
+                          ↓
+                       Parquet (HDFS/S3) → Spark Batch → Aggregates
+```
 
 ---
 
-## ⚙️ Tech Stack
+## 📦 Project Structure
 
-| Layer              | Tools & Technologies                       |
-|-------------------|--------------------------------------------|
-| Data Generation    | Python                                     |
-| Ingestion          | Apache Kafka                               |
-| Stream Processing  | Spark Structured Streaming                 |
-| Batch Processing   | PySpark / dbt                              |
-| Storage            | Redis (real-time), PostgreSQL (batch)      |
-| API Service        | FastAPI                                    |
-| Containerization   | Docker                                     |
-| (Optional) Monitoring | Prometheus + Grafana                    |
+```
+.
+├── docker-compose.yml
+├── docker/
+│   ├── Dockerfile                 # Dockerfile for spark-submit job
+│   └── spark/
+│       └── app/
+│           ├── stream_watch_events.py  # Spark Structured Streaming job
+│           ├── requirements.txt        # Python dependencies
+│           ├── .env                    # Environment variables (Kafka, Redis)
+│           └── simulate_watch_events.py # Event simulator (Kafka producer)
+├── api/
+│   └── main.py                     # FastAPI app to query Redis
+└── SPARK-CHECKLIST.md              # Debug checklist for Spark streaming job
+```
 
 ---
 
-## 📂 Repository Structure
+## 🔧 Tech Stack
 
-netflix-recommendation-pipeline/
-├── data_simulation/ # User & show event simulators
-├── kafka/ # Kafka + Zookeeper Docker setup
-├── streaming/ # Spark Streaming jobs
-├── batch/ # Batch ETL scripts or dbt models
-├── api/ # FastAPI app for recommendations
-├── storage/ # PostgreSQL schema, Redis config
-├── monitoring/ # Grafana dashboards (optional)
-├── docker-compose.yml # Multi-service orchestration
-├── architecture.png # System diagram (optional image)
-└── README.md
+- **Kafka**: Real-time event ingestion
+- **Zookeeper**: Kafka coordination
+- **Spark**: Streaming and batch processing
+- **Redis**: Real-time data store for low-latency queries
+- **FastAPI**: Lightweight backend for accessing recommendation data
+- **Docker Compose**: Service orchestration
+
+---
+
+## 🧪 Simulate Watch Events
+
+To simulate watch behavior from users (sends data to Kafka topic):
+
+```bash
+python simulate_watch_events.py
+```
+
+---
+
+## ⚡ Real-Time Pipeline (Spark Submit)
+
+Launches the Spark streaming job to consume Kafka messages and update Redis:
+
+```bash
+docker-compose build spark-submit
+docker-compose up spark-submit
+```
+
+Make sure topic `watch_events` is created and Redis is reachable.
+
+---
+
+## 🌍 FastAPI Real-time API
+
+Runs a simple REST API to query Redis-stored insights:
+
+```bash
+uvicorn main:app --reload --port 8000
+```
+
+- `GET /recommendations/{user_id}` → Returns list of recommendations
+
+---
+
+## 📁 .env Configuration
+
+Inside `spark/app/.env`:
+
+```env
+KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+KAFKA_TOPIC=watch_events
+REDIS_HOST=redis
+REDIS_PORT=6379
+```
+
+---
+
+## 📄 Sample Kafka Topic Creation (Optional)
+
+Create topic manually:
+
+```bash
+docker exec -it kafka kafka-topics --create --topic watch_events   --bootstrap-server kafka:9092 --replication-factor 1 --partitions 1
+```
+
+---
+
+## ✅ Health Checklist
+
+See [SPARK-CHECKLIST.md](SPARK-CHECKLIST.md) for end-to-end testing, log tracing, and common errors.
+
+---
+
+## 👨‍💻 Target Audience
+
+This project is designed to demonstrate **real-time data engineering** workflows and is ideal for:
+
+- Netflix data engineer job applications 🎯
+- Data engineering portfolio projects 🧰
+- Streaming architecture practice ⚙️
+
+---
+
+## 📬 Future Improvements
+
+- Add PostgreSQL or BigQuery as offline warehouse
+- Real-time user profiling with Redis TTLs
+- Stream processing metrics with Prometheus/Grafana
+
+---
+
+## 📘 License
+
+MIT License.
