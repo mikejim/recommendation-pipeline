@@ -1,6 +1,6 @@
 # 🎬 Netflix-Style Content Recommendation Pipeline
 
-A full-stack **Data Engineering project** that simulates a Netflix-style streaming service, processing user watch behavior in **real-time** and **batch** using Kafka, Spark, Redis, and FastAPI. Designed to showcase **streaming data pipelines** and **real-time analytics**.
+This is a full-stack **Data Engineering project** that simulates a streaming service that generates and processes user watch behavior in **real-time** and **batch** using Kafka, Spark, Redis, and FastAPI. Designed to showcase **streaming data pipelines** and **real-time analytics**.
 
 ---
 
@@ -11,6 +11,17 @@ A full-stack **Data Engineering project** that simulates a Netflix-style streami
                           ↓
                        Parquet (HDFS/S3) → Spark Batch → Aggregates
 ```
+
+---
+
+## 🔧 Tech Stack
+
+- **Kafka**: Real-time event ingestion
+- **Zookeeper**: Kafka coordination
+- **Spark**: Streaming and batch processing
+- **Redis**: Real-time data store for low-latency queries
+- **FastAPI**: Lightweight backend for accessing recommendation data
+- **Docker Compose**: Service orchestration
 
 ---
 
@@ -32,16 +43,6 @@ A full-stack **Data Engineering project** that simulates a Netflix-style streami
 └── SPARK-CHECKLIST.md              # Debug checklist for Spark streaming job
 ```
 
----
-
-## 🔧 Tech Stack
-
-- **Kafka**: Real-time event ingestion
-- **Zookeeper**: Kafka coordination
-- **Spark**: Streaming and batch processing
-- **Redis**: Real-time data store for low-latency queries
-- **FastAPI**: Lightweight backend for accessing recommendation data
-- **Docker Compose**: Service orchestration
 
 ---
 
@@ -109,15 +110,6 @@ See [SPARK-CHECKLIST.md](SPARK-CHECKLIST.md) for end-to-end testing, log tracing
 
 ---
 
-## 👨‍💻 Target Audience
-
-This project is designed to demonstrate **real-time data engineering** workflows and is ideal for:
-
-- Netflix data engineer job applications 🎯
-- Data engineering portfolio projects 🧰
-- Streaming architecture practice ⚙️
-
----
 
 ## 📬 Future Improvements
 
