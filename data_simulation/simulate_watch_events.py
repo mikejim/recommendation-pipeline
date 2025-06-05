@@ -63,7 +63,7 @@ def generate_event():
     return event
 
 # ---------- Streaming Loop ----------
-def stream_events(interval=1.0):
+def stream_events(interval=0.1):
     print(f"🚀 Sending events to Kafka topic '{TOPIC_NAME}' every {interval} second(s)...")
     try:
         while True:
@@ -80,4 +80,4 @@ def stream_events(interval=1.0):
 if __name__ == "__main__":
 # ✅ Create topic BEFORE using it
     create_topic_if_not_exists("localhost:9092", "watch_events")
-    stream_events(interval=1)
+    stream_events(interval=0.1)

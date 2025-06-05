@@ -51,3 +51,6 @@ services:
       - kafka
       - redis
       - spark-master
+    volumes:
+      - ./spark/app:/opt/spark-app
+      - ./spark/app/data/parquet:/opt/spark-app/data/parquet

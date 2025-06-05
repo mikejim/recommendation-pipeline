@@ -18,6 +18,10 @@ USER 1001
 WORKDIR /opt/spark-app
 COPY ./spark/app /opt/spark-app
 
+# Ensure the output directory exists and has correct permissions
+#RUN mkdir -p /opt/spark-app/data/parquet && \
+#    chmod -R 777 /opt/spark-app/data/parquet
+
 RUN pip install --no-cache-dir -r requirements.txt
 
 USER 1001
