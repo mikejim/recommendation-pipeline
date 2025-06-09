@@ -44,6 +44,7 @@ services:
       - spark-master
 
   spark-submit:
+    user: "0:0"
     build:
       context: .
       dockerfile: Dockerfile
@@ -53,4 +54,4 @@ services:
       - spark-master
     volumes:
       - ./spark/app:/opt/spark-app
-      - ./spark/app/data/parquet:/opt/spark-app/data/parquet
+#      - ./spark/app/data/parquet:/opt/spark-app/data/parquet

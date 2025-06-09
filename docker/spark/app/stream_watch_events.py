@@ -86,4 +86,7 @@ console_query = parsed.writeStream \
 
 # Wait for the streams to finish
 # This will block until the streams are terminated.
-spark.streams.awaitAnyTermination()
+#spark.streams.awaitAnyTermination()
+parquet_query.awaitTermination()
+redis_query.awaitTermination()
+console_query.awaitTermination()

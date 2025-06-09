@@ -12,7 +12,7 @@ RUN apt-get update && \
 
 ENV PATH="/opt/conda/bin:$PATH"
 
-USER 1001
+#USER 1001
 
 #COPY spark/app/stream_watch_events.py /opt/spark-app/
 WORKDIR /opt/spark-app
@@ -24,7 +24,7 @@ COPY ./spark/app /opt/spark-app
 
 RUN pip install --no-cache-dir -r requirements.txt
 
-USER 1001
+#USER 1001
 
 #CMD ["bash", "-c", "sleep 20 && /opt/bitnami/spark/bin/spark-submit", "--master", "spark://spark-master:7077", "--packages", "org.apache.spark:spark-sql-kafka-0-10_2.12:3.3.1", "/opt/spark-app/stream_watch_events.py"]
 CMD ["bash", "-c", "sleep 50 && /opt/bitnami/spark/bin/spark-submit --master spark://spark-master:7077 --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.3.1 /opt/spark-app/stream_watch_events.py"]
