@@ -54,4 +54,9 @@ services:
       - spark-master
     volumes:
       - ./spark/app:/opt/spark-app
-#      - ./spark/app/data/parquet:/opt/spark-app/data/parquet
+      # Windows-compatible volume mount - use absolute path from project root
+      - ./data:/opt/spark-app/data
+    environment:
+      - SPARK_MASTER_URL=spark://spark-master:7077
+      - PYTHONPATH=/opt/spark-app
+  

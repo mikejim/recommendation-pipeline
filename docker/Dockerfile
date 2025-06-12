@@ -12,19 +12,21 @@ RUN apt-get update && \
 
 ENV PATH="/opt/conda/bin:$PATH"
 
-#USER 1001
-
-#COPY spark/app/stream_watch_events.py /opt/spark-app/
 WORKDIR /opt/spark-app
 COPY ./spark/app /opt/spark-app
 
-# Ensure the output directory exists and has correct permissions
-#RUN mkdir -p /opt/spark-app/data/parquet && \
-#    chmod -R 777 /opt/spark-app/data/parquet
+# Install Python dependencies first
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Create the output directories and set permissions (Windows volume mount compatible)
+RUN mkdir -p /opt/spark-app/data/parquet/watch_events && \
+    mkdir -p /opt/spark-app/data/parquet/checkpoints/watch_events && \
+    chmod -R 777 /opt/spark-app && \
+    chmod -R 777 /tmp
+
+# Stay as root user for Windows compatibility
+USER root
 
 RUN pip install --no-cache-dir -r requirements.txt
 
-#USER 1001
-
-#CMD ["bash", "-c", "sleep 20 && /opt/bitnami/spark/bin/spark-submit", "--master", "spark://spark-master:7077", "--packages", "org.apache.spark:spark-sql-kafka-0-10_2.12:3.3.1", "/opt/spark-app/stream_watch_events.py"]
 CMD ["bash", "-c", "sleep 50 && /opt/bitnami/spark/bin/spark-submit --master spark://spark-master:7077 --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.3.1 /opt/spark-app/stream_watch_events.py"]

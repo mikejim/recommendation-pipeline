@@ -11,3 +11,7 @@ kafka-topics --create --topic watch_events \
 
 # Good links:
 https://www.sparkcodehub.com/pyspark/dataframe/create-dataframe-from-kafka-stream
+
+
+Spark Streaming:
+https://spark.apache.org/docs/3.5.3/structured-streaming-programming-guide.html
