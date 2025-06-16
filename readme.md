@@ -101,7 +101,7 @@ REDIS_PORT=6379
 
 ---
 
-## ✅ Health Checklist
+## Health Checklist
 
 See [SPARK-CHECKLIST.md](SPARK-CHECKLIST.md) for end-to-end testing, log tracing, and common errors.
 
