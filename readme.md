@@ -9,6 +9,9 @@ This is a full-stack **Data Engineering project** that simulates a streaming ser
 ![alt text for screen readers](/kafka_arch.jpg "Streaming architecture")
 
 ```
+
+On future modifications, we want to achieve this: (FastAPI to show a dashboard, parquet located in AWS or Azure).
+
 [ User Events ] → Kafka → Spark (Structured Streaming) → Redis → FastAPI (Real-time API)
                           ↓
                        Parquet (HDFS/S3) → Spark Batch → Aggregates
