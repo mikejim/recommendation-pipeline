@@ -12,8 +12,16 @@ RUN apt-get update && \
 
 ENV PATH="/opt/conda/bin:$PATH"
 
+# Use system Python for PySpark (more reliable in distributed mode)
+ENV PYSPARK_PYTHON=python3.12
+ENV PYSPARK_DRIVER_PYTHON=python3.12
+
 WORKDIR /opt/spark-app
 COPY ./spark/app /opt/spark-app
+
+# Install Python dependencies in both conda and system Python
+RUN pip install --no-cache-dir -r requirements.txt
+RUN python3.12 -m pip install --no-cache-dir -r requirements.txt
 
 # Install Python dependencies first
 RUN pip install --no-cache-dir -r requirements.txt

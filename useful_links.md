@@ -14,4 +14,7 @@ https://www.sparkcodehub.com/pyspark/dataframe/create-dataframe-from-kafka-strea
 
 
 Spark Streaming:
-https://spark.apache.org/docs/3.5.3/structured-streaming-programming-guide.html
+
+[Structured Streaming](https://spark.apache.org/docs/3.5.3/structured-streaming-programming-guide.html)
+
+[Stream Processing](https://www.macrometa.com/event-stream-processing/spark-structured-streaming)
