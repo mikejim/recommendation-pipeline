@@ -1,4 +1,5 @@
 redis
 python-dotenv
 pyspark
-
+pandas
+pyarrow

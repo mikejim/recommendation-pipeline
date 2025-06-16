@@ -3,18 +3,16 @@ import json
 import os
 from dotenv import load_dotenv
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import from_json, col, window, to_timestamp
-from pyspark.sql.types import StructType, StringType, IntegerType, TimestampType
-from pyspark.sql.functions import sum as _sum
+from pyspark.sql.functions import from_json, col, to_timestamp, current_timestamp
+from pyspark.sql.types import StructType, StringType, IntegerType
 
 # Load environment variables
 load_dotenv()
 
-# Redis connection settings
-redis_host = os.getenv("REDIS_HOST", "localhost")
-redis_port = int(os.getenv("REDIS_PORT", 6379))
+# Redis connection
+redis_client = redis.Redis(host='redis', port=6379, db=0, decode_responses=True)
 
-# Define schema of Kafka message
+# Schema
 schema = StructType() \
     .add("user_id", StringType()) \
     .add("show_id", StringType()) \
@@ -23,206 +21,325 @@ schema = StructType() \
     .add("duration_watched", IntegerType()) \
     .add("timestamp", StringType())
 
-# Initialize Spark with better configuration for streaming
+# Initialize Spark with optimized settings and minimal logging
 spark = SparkSession.builder \
-    .appName("WatchEventStreamer") \
+    .appName("WatchEventsStream") \
     .config("spark.sql.streaming.forceDeleteTempCheckpointLocation", "true") \
+    .config("spark.sql.streaming.checkpointLocation.deleteOnExit", "true") \
     .config("spark.serializer", "org.apache.spark.serializer.KryoSerializer") \
-    .config("spark.sql.adaptive.enabled", "false") \
+    .config("spark.hadoop.fs.defaultFS", "file:///") \
     .getOrCreate()
-spark.sparkContext.setLogLevel("WARN")
 
-print("🚀 Spark session created successfully")
+# Set minimal logging
+spark.sparkContext.setLogLevel("ERROR")
+import logging
+logging.getLogger("py4j").setLevel(logging.ERROR)
+logging.getLogger("pyspark").setLevel(logging.ERROR)
 
-# Use /tmp paths - these ALWAYS have proper permissions
-PARQUET_PATH = "/tmp/parquet/watch_events/"
-CHECKPOINT_PATH = "/tmp/parquet/checkpoints/watch_events/"
-REDIS_CHECKPOINT_PATH = "/tmp/checkpoint_redis"
+print("🚀 Starting Watch Events Pipeline...")
+print("📊 Processing batches every 30 seconds...")
+print("⏳ Running... Press Ctrl+C to stop\n")
 
-# Create directories (these will definitely work)
-os.makedirs(PARQUET_PATH, exist_ok=True)
-os.makedirs(CHECKPOINT_PATH, exist_ok=True)
-os.makedirs(REDIS_CHECKPOINT_PATH, exist_ok=True)
-print(f"✅ Created directories: {PARQUET_PATH}, {CHECKPOINT_PATH}")
-
-# Read from Kafka topic
-print("📡 Setting up Kafka stream...")
 df = spark.readStream \
     .format("kafka") \
     .option("kafka.bootstrap.servers", "kafka:9093") \
     .option("subscribe", "watch_events") \
     .option("startingOffsets", "latest") \
     .option("failOnDataLoss", "false") \
+    .option("maxOffsetsPerTrigger", "1000") \
     .load()
 
-# Convert value to JSON and parse fields
-parsed = df.selectExpr("CAST(value AS STRING)") \
-    .select(from_json(col("value"), schema).alias("data")) \
+# Parse JSON and transform - FIX: Add better error handling and validation
+parsed_df = df.selectExpr("CAST(value AS STRING) as json_string") \
+    .filter(col("json_string").isNotNull() & (col("json_string") != "")) \
+    .select(from_json(col("json_string"), schema).alias("data")) \
+    .filter(col("data").isNotNull()) \
     .select("data.*") \
-    .withColumn("event_time", to_timestamp(col("timestamp")))
+    .filter(col("user_id").isNotNull() & col("show_id").isNotNull()) \
+    .withColumn("event_time", to_timestamp(col("timestamp"))) \
+    .withColumn("processed_at", current_timestamp())
 
-print("🔄 Setting up aggregation...")
-
-# Aggregate total watch time per user and genre over 1-minute window
-agg = parsed.groupBy(
-        col("user_id"),
-        col("genre"),
-        window(col("event_time"), "1 minute")
-    ).agg(_sum("duration_watched").alias("total_watch_time"))
-
-# Function to write each micro-batch to Redis
-def write_to_redis(batch_df, batch_id):
-    try:
-        r = redis.Redis(host=redis_host, port=redis_port, decode_responses=True)
-        count = 0
-        for row in batch_df.collect():
-            key = f"user:{row['user_id']}:genre:{row['genre']}"
-            value = row["total_watch_time"] 
-            r.set(key, value)
-            count += 1
-        print(f"🔁 Batch {batch_id}: Wrote {count} records to Redis")
-    except Exception as e:
-        print(f"❌ Redis error in batch {batch_id}: {e}")
-
-print("🚀 Starting Redis stream...")
-# Stream #1: Write stream with foreachBatch
-redis_query = agg.writeStream \
-    .outputMode("update") \
-    .foreachBatch(write_to_redis) \
-    .option("checkpointLocation", REDIS_CHECKPOINT_PATH) \
-    .trigger(processingTime="10 seconds") \
-    .start()
-
-print(f"💾 Starting Parquet stream to: {PARQUET_PATH}")
-
-# Stream #2: Write raw data to Parquet files - VERSIÓN CORREGIDA CON DIAGNÓSTICO
-def write_parquet_batch(batch_df, batch_id):
-    try:
-        count = batch_df.count()
-        print(f"📁 Parquet Batch {batch_id}: Processing {count} records")
-        
-        if count > 0:
-            # Show schema and sample data
-            print(f"🔍 Schema for batch {batch_id}:")
-            batch_df.printSchema()
-            print(f"📊 Sample data for batch {batch_id}:")
-            batch_df.show(3, truncate=False)
-            
-            # Check for null values that might cause issues
-            print(f"🔎 Checking for nulls in batch {batch_id}:")
-            for col_name in batch_df.columns:
-                null_count = batch_df.filter(batch_df[col_name].isNull()).count()
-                print(f"  {col_name}: {null_count} nulls")
-            
-            # First, let's write as JSON to confirm data exists
-            json_path = f"/tmp/json_test/batch_{batch_id}"
-            batch_df.coalesce(1).write \
-                .mode("overwrite") \
-                .json(json_path)
-            print(f"📋 JSON test written to: {json_path}")
-            
-            # Check JSON files
-            import os
-            if os.path.exists(json_path):
-                json_files = os.listdir(json_path)
-                print(f"📋 JSON files created: {json_files}")
-            
-            # Now try parquet with different approaches
-            output_path = f"{PARQUET_PATH}/batch_{batch_id}"
-            print(f"📝 Writing parquet to: {output_path}")
-            
-            # Try approach 1: Simple write
-            try:
-                batch_df.coalesce(1).write \
-                    .mode("overwrite") \
-                    .parquet(output_path)
-                print("✅ Simple parquet write succeeded")
-            except Exception as e:
-                print(f"❌ Simple parquet write failed: {e}")
-                
-                # Try approach 2: Without compression
-                try:
-                    batch_df.coalesce(1).write \
-                        .mode("overwrite") \
-                        .option("compression", "none") \
-                        .parquet(output_path + "_no_compression")
-                    print("✅ No compression parquet write succeeded")
-                except Exception as e2:
-                    print(f"❌ No compression parquet write failed: {e2}")
-                    
-                    # Try approach 3: Cast all columns to string
-                    try:
-                        string_df = batch_df.select(*[col(c).cast("string").alias(c) for c in batch_df.columns])
-                        string_df.coalesce(1).write \
-                            .mode("overwrite") \
-                            .parquet(output_path + "_string_cast")
-                        print("✅ String cast parquet write succeeded")
-                    except Exception as e3:
-                        print(f"❌ String cast parquet write failed: {e3}")
-                
-            print(f"✅ Parquet Batch {batch_id}: Successfully wrote {count} records")
-            
-            # Verify files were created
-            import os
-            if os.path.exists(output_path):
-                files = os.listdir(output_path)
-                print(f"📂 Files created in {output_path}: {files}")
-                parquet_files = [f for f in files if f.endswith('.parquet')]
-                print(f"🗂️ Parquet files: {parquet_files}")
-            else:
-                print(f"❌ Directory {output_path} was not created!")
-                
-        else:
-            print(f"⚠️ Parquet Batch {batch_id}: No data to write")
-            
-    except Exception as e:
-        print(f"❌ Parquet Batch {batch_id} error: {e}")
-        import traceback
-        traceback.print_exc()
-
-parquet_query = parsed.writeStream \
-    .foreachBatch(write_parquet_batch) \
-    .option("checkpointLocation", CHECKPOINT_PATH) \
-    .outputMode("append") \
-    .trigger(processingTime="30 seconds") \
-    .start()
-
-print("📦 Parquet stream started:", parquet_query.isActive)
-
-# Stream #3: Debug console output (opcional)
-def debug_batch(batch_df, batch_id):
-    count = batch_df.count()
-    print(f"🧪 Debug Batch {batch_id}: Row count = {count}")
-    if count > 0:
-        print("Sample data:")
-        batch_df.show(5, truncate=False)
-    else:
-        print("No data in this batch")
-
-debug_query = parsed.writeStream \
-    .foreachBatch(debug_batch) \
-    .option("checkpointLocation", "/tmp/checkpoint_debug/") \
-    .trigger(processingTime="15 seconds") \
-    .start()
-
-print("✅ All streams started successfully!")
-print("🖥️ Active streams:")
-print(f"  - Redis stream: {redis_query.isActive}")
-print(f"  - Parquet stream: {parquet_query.isActive}")
-print(f"  - Debug stream: {debug_query.isActive}")
-print("⏳ Streams are running... Press Ctrl+C to stop")
-
-# Wait for the streams to finish
-try:
-    spark.streams.awaitAnyTermination()
-except KeyboardInterrupt:
-    print("🛑 Stopping streams...")
-    for stream in spark.streams.active:
-        stream.stop()
-    spark.stop()
-    print("✅ All streams stopped")
-except Exception as e:
-    print(f"❌ Stream error: {e}")
-finally:
-    spark.stop()
+def process_batch(batch_df, batch_id):
+    """Process each batch: write to Redis and Parquet"""
+    # Cache the batch for multiple operations
+    batch_df.cache()
     
+    try:
+        record_count = batch_df.count()
+        
+        if record_count == 0:
+            print(f"⚡ Batch {batch_id}: No records to process")
+            return
+        
+        print(f"⚡ Batch {batch_id}: {record_count} records", end=" → ")
+        
+        # DEBUG: Show actual data before writing
+        print(f"\n[DEBUG] Sample data:")
+        sample_rows = batch_df.limit(2).collect()
+        for i, row in enumerate(sample_rows):
+            print(f"[DEBUG] Row {i}: user_id={row.user_id}, show_id={row.show_id}, genre={row.genre}")
+        
+        # 1. Write to Redis
+        redis_count = 0
+        for row in batch_df.collect():
+            try:
+                redis_key = f"watch_event:{row.user_id}:{row.show_id}:{batch_id}"
+                redis_value = {
+                    "user_id": row.user_id,
+                    "show_id": row.show_id,
+                    "genre": row.genre,
+                    "device_type": row.device_type,
+                    "duration_watched": row.duration_watched,
+                    "event_time": str(row.event_time),
+                    "processed_at": str(row.processed_at)
+                }
+                redis_client.setex(redis_key, 3600, json.dumps(redis_value))
+                redis_count += 1
+            except Exception as e:
+                print(f"Redis error for record: {e}")
+        
+        print(f"Redis: {redis_count}", end=" → ")
+        
+        # 2. Write to Parquet - MULTIPLE SOLUTION ATTEMPTS
+        try:
+            # Ensure the directory exists
+            parquet_base = "/tmp/watch_events_parquet"
+            os.makedirs(parquet_base, exist_ok=True)
+            
+            # Count files before writing
+            files_before = set(os.listdir(parquet_base)) if os.path.exists(parquet_base) else set()
+            
+            # Debug: Check partitioning and actual data
+            print(f"\n[DEBUG] DataFrame info before write:")
+            print(f"[DEBUG] Total records: {record_count}")
+            print(f"[DEBUG] Partitions: {batch_df.rdd.getNumPartitions()}")
+            
+            if record_count > 0:
+                # SOLUTION 1: Try multiple write strategies
+                success = False
+                method = "unknown"
+                
+                try:
+                    # Strategy A: Direct manual file write using pandas
+                    print(f"[DEBUG] Trying Strategy A: Manual pandas write...")
+                    
+                    # Convert to pandas and write manually
+                    collected_data = batch_df.collect()
+                    print(f"[DEBUG] Materialized {len(collected_data)} rows")
+                    
+                    # Convert to pandas DataFrame
+                    import pandas as pd
+                    
+                    rows_data = []
+                    for row in collected_data:
+                        row_dict = {
+                            'user_id': row.user_id,
+                            'show_id': row.show_id,
+                            'genre': row.genre,
+                            'device_type': row.device_type,
+                            'duration_watched': row.duration_watched,
+                            'event_time': row.event_time,
+                            'processed_at': row.processed_at
+                        }
+                        rows_data.append(row_dict)
+                    
+                    pandas_df = pd.DataFrame(rows_data)
+                    print(f"[DEBUG] Created pandas DataFrame with {len(pandas_df)} rows")
+                    
+                    # Write using pandas
+                    output_file = os.path.join(parquet_base, f"batch_{batch_id}.parquet")
+                    pandas_df.to_parquet(output_file, engine='pyarrow', index=False)
+                    print(f"[DEBUG] Wrote to {output_file}")
+                    
+                    method = "pandas"
+                    success = True
+                    
+                except Exception as e1:
+                    print(f"[DEBUG] Strategy A failed: {e1}")
+                    
+                    try:
+                        # Strategy B: Write to CSV first as test
+                        print(f"[DEBUG] Trying Strategy B: CSV write test...")
+                        
+                        # Test with simple CSV write
+                        csv_file = os.path.join(parquet_base, f"batch_{batch_id}.csv")
+                        batch_df.coalesce(1).write \
+                            .mode("append") \
+                            .option("header", "true") \
+                            .csv(csv_file)
+                        
+                        method = "csv-test"
+                        success = True
+                        
+                    except Exception as e2:
+                        print(f"[DEBUG] Strategy B failed: {e2}")
+                        
+                        try:
+                            # Strategy C: Write with explicit partitioning
+                            print(f"[DEBUG] Trying Strategy C: Repartition write...")
+                            
+                            batch_df.repartition(1).write \
+                                .mode("append") \
+                                .parquet(parquet_base)
+                            
+                            method = "repartitioned"
+                            success = True
+                            
+                        except Exception as e3:
+                            print(f"[DEBUG] Strategy C failed: {e3}")
+                            
+                            # Strategy D: Save as temporary file then move
+                            print(f"[DEBUG] Trying Strategy D: Temp file approach...")
+                            
+                            temp_path = f"/tmp/temp_parquet_{batch_id}"
+                            batch_df.coalesce(1).write \
+                                .mode("overwrite") \
+                                .parquet(temp_path)
+                            
+                            # Move files from temp to final location
+                            import shutil
+                            if os.path.exists(temp_path):
+                                for f in os.listdir(temp_path):
+                                    if f.endswith('.parquet'):
+                                        shutil.move(
+                                            os.path.join(temp_path, f),
+                                            os.path.join(parquet_base, f"{batch_id}_{f}")
+                                        )
+                                # Clean up temp directory
+                                shutil.rmtree(temp_path, ignore_errors=True)
+                                
+                            method = "temp-file"
+                            success = True
+                
+                if not success:
+                    print(f"[DEBUG] All write strategies failed!")
+            else:
+                print("[DEBUG] No records to write")
+                method = "skipped"
+            
+            # Give Spark a moment to flush files
+            import time
+            time.sleep(2)  # Increased wait time
+            
+            # Count files after writing
+            files_after = set(os.listdir(parquet_base)) if os.path.exists(parquet_base) else set()
+            new_files = files_after - files_before
+            
+            # More comprehensive file detection
+            data_files = []
+            for f in new_files:
+                full_path = os.path.join(parquet_base, f)
+                if os.path.isfile(full_path):
+                    file_size = os.path.getsize(full_path)
+                    # Consider any .parquet file or part file with size > 0 as data
+                    if (f.endswith('.parquet') or f.startswith('part-')) and file_size > 0:
+                        data_files.append(f)
+            
+            success_files = [f for f in new_files if f == '_SUCCESS']
+            other_files = [f for f in new_files if f not in data_files and f not in success_files]
+            
+            all_files = list(files_after)
+            total_size = sum(os.path.getsize(os.path.join(parquet_base, f)) for f in all_files if not f.startswith('.') and os.path.isfile(os.path.join(parquet_base, f)))
+            
+            print(f"Parquet: ✅ ({method}) (new: {len(data_files)} data files, {len(success_files)} success, {len(other_files)} other, total size: {total_size} bytes)", end=" → ")
+            
+            # Show file details if still no data files
+            if len(data_files) == 0 and record_count > 0:
+                print(f"\n[DEBUG] Expected data but got no files. All files: {sorted(all_files)}")
+                # Try to understand what happened by checking file sizes
+                for f in all_files:
+                    if not f.startswith('.'):
+                        full_path = os.path.join(parquet_base, f)
+                        if os.path.isfile(full_path):
+                            size = os.path.getsize(full_path)
+                            print(f"[DEBUG] File: {f}, Size: {size} bytes")
+            elif len(data_files) > 0:
+                print(f"\n[DEBUG] SUCCESS! Created data files: {data_files}")
+                    
+        except Exception as e:
+            print(f"Parquet: ❌ ({str(e)[:50]}...)", end=" → ")
+            import traceback
+            print(f"\n[DEBUG] Full error: {traceback.format_exc()}")
+        
+        # 3. Log batch stats
+        try:
+            stats_key = f"batch_stats:{batch_id}"
+            stats = {
+                "batch_id": batch_id,
+                "record_count": record_count,
+                "processed_at": str(current_timestamp())
+            }
+            redis_client.setex(stats_key, 7200, json.dumps(stats, default=str))
+            print("✅ DONE")
+            
+        except Exception as e:
+            print(f"Stats: ❌ ({str(e)[:20]}...)")
+        
+    except Exception as e:
+        print(f"❌ BATCH ERROR: {str(e)[:50]}...")
+        import traceback
+        print(f"[DEBUG] Full batch error: {traceback.format_exc()}")
+    
+    finally:
+        batch_df.unpersist()
+
+# ALTERNATIVE APPROACH: Use built-in file sink instead of foreachBatch for Parquet
+# This is often more reliable for file writing
+def use_file_sink_approach():
+    """Alternative approach using built-in file sink"""
+    print("🔄 Using file sink approach...")
+    
+    # Write to Parquet using built-in sink
+    parquet_query = parsed_df.writeStream \
+        .format("parquet") \
+        .option("path", "/tmp/watch_events_parquet_alt") \
+        .option("checkpointLocation", "/tmp/watch_events_parquet_checkpoint") \
+        .trigger(processingTime="30 seconds") \
+        .outputMode("append") \
+        .start()
+    
+    # Write to console for debugging
+    console_query = parsed_df.writeStream \
+        .format("console") \
+        .option("truncate", "false") \
+        .trigger(processingTime="30 seconds") \
+        .outputMode("append") \
+        .start()
+    
+    return parquet_query, console_query
+
+# Choose approach: comment/uncomment as needed
+USE_FILE_SINK = False  # Set to True to try the alternative approach
+
+if USE_FILE_SINK:
+    parquet_query, console_query = use_file_sink_approach()
+    
+    try:
+        # Keep both queries running
+        spark.streams.awaitAnyTermination()
+    except KeyboardInterrupt:
+        print("\n🛑 Stopping pipeline...")
+        parquet_query.stop()
+        console_query.stop()
+        print("✅ Pipeline stopped")
+    finally:
+        spark.stop()
+
+else:
+    # Original foreachBatch approach with fixes
+    query = parsed_df.writeStream \
+        .foreachBatch(process_batch) \
+        .option("checkpointLocation", "/tmp/watch_events_checkpoint") \
+        .trigger(processingTime="30 seconds") \
+        .outputMode("append") \
+        .start()
+
+    try:
+        # Keep the application running
+        query.awaitTermination()
+    except KeyboardInterrupt:
+        print("\n🛑 Stopping pipeline...")
+        query.stop()
+        print("✅ Pipeline stopped")
+    finally:
+        spark.stop()
