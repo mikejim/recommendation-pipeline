@@ -4,7 +4,7 @@ This is a full-stack **Data Engineering project** that simulates a streaming ser
 
 ---
 
-## 🚀 Architecture Overview
+## Architecture Overview
 
 ![alt text for screen readers](/kafka_arch.jpg "Streaming architecture")
 
@@ -21,7 +21,7 @@ parquet located in AWS or Azure).
 
 ---
 
-## 🔧 Tech Stack
+## Tech Stack
 
 - **Kafka**: Real-time event ingestion
 - **Zookeeper**: Kafka coordination
@@ -32,7 +32,7 @@ parquet located in AWS or Azure).
 
 ---
 
-## 📦 Project Structure
+## Project Structure
 
 ```
 .
@@ -46,14 +46,14 @@ parquet located in AWS or Azure).
 │           ├── .env                    # Environment variables (Kafka, Redis)
 │           └── simulate_watch_events.py # Event simulator (Kafka producer)
 ├── api/
-│   └── main.py                     # FastAPI app to query Redis
+│   └── main.py                     # FastAPI app to query Redis (future mod)
 └── SPARK-CHECKLIST.md              # Debug checklist for Spark streaming job
 ```
 
 
 ---
 
-## 🧪 Simulate Watch Events
+## Simulate Watch Events
 
 To simulate watch behavior from users (sends data to Kafka topic):
 
@@ -63,7 +63,7 @@ python simulate_watch_events.py
 
 ---
 
-## ⚡ Real-Time Pipeline (Spark Submit)
+## Real-Time Pipeline (Spark Submit)
 
 Launches the Spark streaming job to consume Kafka messages and update Redis:
 
@@ -76,7 +76,7 @@ Make sure topic `watch_events` is created and Redis is reachable.
 
 ---
 
-## 🌍 FastAPI Real-time API
+## FastAPI Real-time API (future modification)
 
 Runs a simple REST API to query Redis-stored insights:
 
@@ -88,7 +88,7 @@ uvicorn main:app --reload --port 8000
 
 ---
 
-## 📁 .env Configuration
+## .env Configuration
 
 Inside `spark/app/.env`:
 
@@ -101,16 +101,6 @@ REDIS_PORT=6379
 
 ---
 
-## 📄 Sample Kafka Topic Creation (Optional)
-
-Create topic manually:
-
-```bash
-docker exec -it kafka kafka-topics --create --topic watch_events   --bootstrap-server kafka:9092 --replication-factor 1 --partitions 1
-```
-
----
-
 ## ✅ Health Checklist
 
 See [SPARK-CHECKLIST.md](SPARK-CHECKLIST.md) for end-to-end testing, log tracing, and common errors.
@@ -118,7 +108,7 @@ See [SPARK-CHECKLIST.md](SPARK-CHECKLIST.md) for end-to-end testing, log tracing
 ---
 
 
-## 📬 Future Improvements
+## Future Improvements
 
 - Add PostgreSQL or BigQuery as offline warehouse
 - Real-time user profiling with Redis TTLs
@@ -126,6 +116,6 @@ See [SPARK-CHECKLIST.md](SPARK-CHECKLIST.md) for end-to-end testing, log tracing
 
 ---
 
-## 📘 License
+## License
 
 MIT License.
