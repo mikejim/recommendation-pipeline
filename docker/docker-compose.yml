@@ -34,6 +34,8 @@ services:
       - SPARK_MODE=master
     ports:
       - "8080:8080"
+    volumes:
+      - ./shared_volume:/app/shared_volume
 
   spark-worker:
     image: bitnami/spark:latest
@@ -42,6 +44,8 @@ services:
       - SPARK_MASTER_URL=spark://spark-master:7077
     depends_on:
       - spark-master
+    volumes:
+      - ./shared_volume:/app/shared_volume
 
   spark-submit:
     user: "0:0"
@@ -53,10 +57,16 @@ services:
       - redis
       - spark-master
     volumes:
-      - ./spark/app:/opt/spark-app
+      - ./shared_volume:/app/shared_volume
+      #- ./spark/app:/opt/spark-app
       # Windows-compatible volume mount - use absolute path from project root
-      - ./data:/opt/spark-app/data
+      #- ./data:/opt/spark-app/data
     environment:
       - SPARK_MASTER_URL=spark://spark-master:7077
       - PYTHONPATH=/opt/spark-app
-  
+    entrypoint: ["/bin/bash", "/app/entrypoint.sh"]
+    command: >
+      bash -c "sleep 30 && /opt/bitnami/spark/bin/spark-submit
+      --master spark://spark-master:7077
+      --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.3.1
+      /opt/spark-app/stream_watch_events.py"

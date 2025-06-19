@@ -1,0 +1,38 @@
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Jupyter notebook checkpoints
+.ipynb_checkpoints
+
+# Virtual environments
+.venv/
+env/
+venv/
+
+# Local environment variables
+.env
+
+# VS Code settings
+.vscode/
+
+# Docker-related cache
+*.log
+*.pid
+*.sock
+
+# Spark outputs
+shared_volume/
+data/
+checkpoints/
+.parquet/
+.parquet_output/
+*/_SUCCESS
+*/_start*
+*/part-*
+
+# OS junk
+.DS_Store
+Thumbs.db

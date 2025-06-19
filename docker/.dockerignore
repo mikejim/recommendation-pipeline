@@ -1,0 +1,21 @@
+# Ignore Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Ignore environment
+.env
+
+# Ignore host volume folders
+shared_volume/
+data/
+.parquet/
+checkpoints/
+
+# Ignore system files
+.DS_Store
+Thumbs.db
+
+# Ignore Git
+.git
+.gitignore
