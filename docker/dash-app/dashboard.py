@@ -31,6 +31,21 @@ app.layout = html.Div([
                 'textAlign': 'justify'
             }),
             html.P([
+                "The data used in this dashboard is sourced from a streaming pipeline that processes watch events in real-time. ",
+                "Parquet files are generated every 30 seconds, capturing user interactions with various shows. ",
+                "Spark is used to process these events, aggregating watch time by genre and time of day. ",
+                "Kafka is utilized for real-time data ingestion, while Redis is employed for fast access to user-specific watch events. ",
+                "For more details on the data processing pipeline, refer to the project repository.",
+                html.A("https://github.com/mikejim/recommendation-pipeline", href="https://github.com/mikejim/recommendation-pipeline", target="_blank")
+            ], 
+                style={
+                'fontSize': '16px',
+                'lineHeight': '1.6',
+                'color': '#34495e',
+                'marginBottom': '20px',
+                'textAlign': 'justify'
+            }),
+            html.P([
                 "📈 Real-time data updates every 30 seconds | ",
                 "📊 Interactive visualizations | ",
                 "🎬 Genre-based analytics | ",
