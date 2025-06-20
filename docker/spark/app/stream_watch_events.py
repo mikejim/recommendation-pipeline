@@ -54,6 +54,8 @@ df = spark.readStream \
     .option("startingOffsets", "latest") \
     .option("failOnDataLoss", "false") \
     .option("maxOffsetsPerTrigger", "1000") \
+    .option("kafka.consumer.log.level", "ERROR") \
+    .option("kafka.log.level", "ERROR") \
     .load()
 
 # Parse JSON and transform - FIX: Add better error handling and validation
