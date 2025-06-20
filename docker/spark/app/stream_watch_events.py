@@ -82,8 +82,8 @@ def process_batch(batch_df, batch_id):
             redis_value = f"{row.event_time}|{row.show_id}"
             redis_client.rpush(redis_key, redis_value)
         print(f"[spark] ✅ Redis updated with {batch_df.count()} events")
-
-    # Spark-native Parquet writing
+ 
+    # Spark-native Parquet writing 
     output_path = os.path.join(parquet_base, f"batch_{batch_id}")
     batch_df.coalesce(1).write.mode("overwrite").parquet(output_path)
     print(f"[spark] 💾 Written to Parquet at {output_path}")

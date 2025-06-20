@@ -3,3 +3,5 @@ python-dotenv
 pyspark
 pandas
 pyarrow
+dash
+plotly

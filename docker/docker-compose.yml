@@ -58,6 +58,7 @@ services:
       - spark-master
     volumes:
       - ./shared_volume:/app/shared_volume
+      - ./log4j.properties:/opt/bitnami/spark/conf/log4j.properties
       #- ./spark/app:/opt/spark-app
       # Windows-compatible volume mount - use absolute path from project root
       #- ./data:/opt/spark-app/data
@@ -70,3 +71,15 @@ services:
       --master spark://spark-master:7077
       --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.3.1
       /opt/spark-app/stream_watch_events.py"
+  dash-app:
+    build: .
+    container_name: dash-app
+    ports:
+      - "8050:8050"
+    volumes:
+      - ./shared_volume:/app/shared_volume
+      - ./dash-app:/app/dash-app   
+      - ./entrypoint_dash.sh:/app/entrypoint_dash.sh
+    entrypoint: ["/bin/bash", "/app/entrypoint_dash.sh"]
+    depends_on:
+      - spark-submit
