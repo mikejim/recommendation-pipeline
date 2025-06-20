@@ -12,12 +12,6 @@ On future modifications, we want to achieve this: (FastAPI to show a dashboard,
 parquet located in AWS or Azure).
 
 
-```
-
-[ User Events ] → Kafka → Spark (Structured Streaming) → Redis → FastAPI (Real-time API)
-                          ↓
-                       Parquet (HDFS/S3) → Spark Batch → Aggregates
-```
 
 ---
 
@@ -76,17 +70,9 @@ Make sure topic `watch_events` is created and Redis is reachable.
 
 ---
 
-## FastAPI Real-time API (future modification)
+## Dashboard with plottly
 
-Runs a simple REST API to query Redis-stored insights:
-
-```bash
-uvicorn main:app --reload --port 8000
-```
-
-- `GET /recommendations/{user_id}` → Returns list of recommendations
-
----
+The results are shown in a Dash application with 3 graphs that are updated in real time. 
 
 ## .env Configuration
 
